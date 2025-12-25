@@ -1,94 +1,172 @@
 import React, {useState, useEffect, useContext} from 'react';
-import api from '../api/axiosConfig';
-import {AuthContext} from '../context/AuthContext';
+import api from '../api/axiosConfig'; // Merkezi API ayarı
+import {AuthContext} from '../context/AuthContext'; // Kullanıcı bilgisi
+import {useNavigate} from 'react-router-dom';
+import {LogOut, User, MapPin, Activity} from 'lucide-react'; // İkonlar
 
 const VictimDashboard = () => {
     const {user, logout} = useContext(AuthContext);
-    const [need, setNeed] = useState({title: '', description: '', categoryId: 1});
-    const [myNeeds, setMyNeeds] = useState([]);
+    const navigate = useNavigate();
 
-    useEffect(() => {
-        if (user?.id) fetchMyNeeds();
-    }, [user]);
+    // State Tanımları
+    const [needs, setNeeds] = useState([]);
+    const [description, setDescription] = useState('');
+    const [categoryId, setCategoryId] = useState(1); // Varsayılan: Gıda
 
-    const fetchMyNeeds = async () => {
+    // 1. Verileri Çekme Fonksiyonu
+    const fetchNeeds = async () => {
         try {
             const response = await api.get('/needs');
-            const filtered = response.data.filter(n => Number(n.userId || n.user?.id) === Number(user.id));
-            setMyNeeds(filtered);
-        } catch (err) {
-            console.error(err);
+            setNeeds(response.data);
+        } catch (error) {
+            console.error("Talepler çekilemedi:", error);
         }
     };
 
-    const handleAddNeed = async (e) => {
+    // Sayfa açılınca verileri çek
+    useEffect(() => {
+        fetchNeeds();
+    }, []);
+
+    // 2. Talep Gönderme Fonksiyonu
+    const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Gereksinim: Frontend üzerinden veritabanına veri ekleme [cite: 10]
-            await api.post('/needs', {...need, userId: user.id});
-            setNeed({title: '', description: '', categoryId: 1});
-            fetchMyNeeds();
-        } catch (err) {
-            alert("Hata!");
+            await api.post('/needs', {
+                description,
+                categoryId: Number(categoryId), // Sayıya çeviriyoruz
+                latitude: 37.7749, // Örnek koordinat (istersen GPS'ten alabiliriz)
+                longitude: -122.4194,
+            });
+            alert('Talep başarıyla oluşturuldu!');
+            setDescription(''); // Formu temizle
+            fetchNeeds(); // Listeyi güncelle
+        } catch (error) {
+            console.error("Talep hatası:", error);
+            alert('Talep oluşturulurken hata oluştu.');
         }
     };
 
-    const handleDelete = async (id) => {
-        // Gereksinim: Frontend üzerinden veri silme [cite: 11]
-        if (window.confirm("Talebi silmek istediğine emin misin Veli?")) {
-            await api.delete(`/needs/${id}`);
-            fetchMyNeeds();
+    // 3. Güvenli Çıkış Fonksiyonu
+    const handleLogout = () => {
+        if (window.confirm("Çıkış yapmak istediğinize emin misiniz?")) {
+            logout();
+            navigate('/login');
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white p-8">
-            <div className="max-w-4xl mx-auto space-y-8">
-                <div className="flex justify-between">
-                    <h1 className="text-2xl font-bold border-l-4 border-blue-600 pl-4 text-blue-500">QuakeSense
-                        Victim</h1>
-                    <button onClick={logout}
-                            className="text-red-500 border border-red-500/30 px-4 py-1 rounded-xl">Güvenli Çıkış
-                    </button>
-                </div>
-
-                <form onSubmit={handleAddNeed}
-                      className="bg-white/5 p-6 rounded-3xl border border-white/10 space-y-4 shadow-xl">
-                    <input className="w-full bg-slate-900 p-4 rounded-2xl" placeholder="İhtiyaç Başlığı"
-                           value={need.title} onChange={e => setNeed({...need, title: e.target.value})} required/>
-                    <textarea className="w-full bg-slate-900 p-4 rounded-2xl h-32" placeholder="Detaylar ve Konum..."
-                              value={need.description} onChange={e => setNeed({...need, description: e.target.value})}
-                              required/>
-                    <button className="w-full bg-blue-600 py-4 rounded-2xl font-bold shadow-lg shadow-blue-600/20">TALEP
-                        YAYINLA
-                    </button>
-                </form>
-
-                <div className="grid gap-4">
-                    <h3 className="text-xl font-semibold opacity-80">Aktif Taleplerim ({myNeeds.length})</h3>
-                    {myNeeds.map(item => (
-                        <div key={item.id}
-                             className="bg-slate-900 p-6 rounded-3xl flex justify-between items-center group border border-white/5 hover:border-blue-500/20 transition">
-                            <div>
-                                <h4 className="font-bold text-lg">{item.title}</h4>
-                                <p className="text-sm text-slate-400">{item.description}</p>
-                                <div className="mt-3">
-                  <span className={`text-[10px] px-3 py-1 rounded-full font-bold border ${
-                      item.status === 'Gönüllü Yolda' ? 'bg-orange-500/20 text-orange-400 border-orange-500/20' :
-                          item.status === 'Yardım Edildi' ? 'bg-green-500/20 text-green-400 border-green-500/20' : 'bg-blue-500/20 text-blue-400 border-blue-500/20'
-                  }`}>
-                    {item.status || 'YAYINDA'}
-                  </span>
-                                </div>
-                            </div>
-                            <button onClick={() => handleDelete(item.id)}
-                                    className="text-red-500 opacity-0 group-hover:opacity-100 transition-all font-semibold">Sil
-                            </button>
+        <div className="min-h-screen bg-slate-950 text-white font-sans">
+            {/* --- ÜST MENÜ (HEADER) --- */}
+            <nav
+                className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-600/20 p-2 rounded-full text-blue-500">
+                        <Activity size={24}/>
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                            QuakeSense
+                        </h1>
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <User size={12}/>
+                            <span>{user?.email || 'Afetzede'}</span>
                         </div>
-                    ))}
+                    </div>
                 </div>
+
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 px-4 py-2 rounded-lg transition text-sm font-bold"
+                >
+                    <LogOut size={16}/>
+                    ÇIKIŞ
+                </button>
+            </nav>
+
+            <div className="max-w-4xl mx-auto p-6 space-y-8">
+
+                {/* --- TALEP OLUŞTURMA FORMU --- */}
+                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-white">
+                        <MapPin className="text-blue-500"/>
+                        Yardım Talebi Oluştur
+                    </h2>
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm text-slate-400 mb-2">İhtiyaç Kategorisi</label>
+                            <select
+                                value={categoryId}
+                                onChange={(e) => setCategoryId(e.target.value)}
+                                className="w-full p-4 bg-slate-950 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-white"
+                            >
+                                <option value={1}>Gıda</option>
+                                <option value={2}>Barınma</option>
+                                <option value={3}>Lojistik</option>
+                                <option value={4}>Sağlık</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm text-slate-400 mb-2">Durum Açıklaması</label>
+                            <textarea
+                                placeholder="Örn: 3 kişi enkaz altındayız, acil su ve battaniye lazım..."
+                                className="w-full p-4 bg-slate-950 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition h-32 resize-none text-white"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-lg transition shadow-lg shadow-blue-900/20"
+                        >
+                            TALEP YAYINLA
+                        </button>
+                    </form>
+                </div>
+
+                {/* --- AKTİF TALEPLER LİSTESİ --- */}
+                <div>
+                    <h3 className="text-xl font-bold text-slate-400 mb-4 px-2">
+                        Aktif Taleplerim ({needs.length})
+                    </h3>
+
+                    {needs.length === 0 ? (
+                        <div
+                            className="text-center py-12 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
+                            <p className="text-slate-500">Henüz bir yardım talebi oluşturmadınız.</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            {needs.map((need) => (
+                                <div key={need.id}
+                                     className="bg-slate-900 p-5 rounded-xl border border-slate-800 flex justify-between items-start hover:border-slate-700 transition">
+                                    <div>
+                                        <span
+                                            className="inline-block px-3 py-1 bg-blue-500/10 text-blue-400 text-xs font-bold rounded-full mb-2">
+                                            Kategori: {need.category?.name || 'Genel'}
+                                        </span>
+                                        <p className="text-slate-300 mt-1">{need.description}</p>
+                                        <p className="text-xs text-slate-500 mt-3">
+                                            {new Date(need.createdAt).toLocaleString('tr-TR')}
+                                        </p>
+                                    </div>
+                                    <div
+                                        className="bg-yellow-500/10 text-yellow-500 px-3 py-1 rounded-lg text-xs font-bold">
+                                        Bekleniyor
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
             </div>
         </div>
     );
 };
+
 export default VictimDashboard;
