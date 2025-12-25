@@ -5,14 +5,18 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Gereksinim: Frontend ve Backend iletişimi için CORS aktif edildi
-  app.enableCors();
+  // CORS Ayarı: Frontend'in backend'e veri gönderebilmesi için şarttır
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
 
+  // ValidationPipe: Formdan gelen verileri (email gibi) kontrol eder
   app.useGlobalPipes(new ValidationPipe());
 
-  // Gereksinim: Bulut sunucusu (Render) PORT'u ortam değişkeninden alır
+  // Render için dinamik port ayarı
   const port = process.env.PORT || 3000;
   await app.listen(port);
 }
-
 bootstrap();
