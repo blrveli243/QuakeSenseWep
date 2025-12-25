@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
-import axios from 'axios';
-import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext'; // Dosya yolunu kontrol et
+import api from '../api/axiosConfig'; // DÜZELTME: Artık merkezi API ayarını kullanıyoruz
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -12,31 +12,40 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:3000/auth/login', { email, password });
+            // ESKİSİ (Hatalı): await axios.post('http://localhost:3000/auth/login', ...)
+            // YENİSİ (Doğru): api.post kullanıyoruz, URL'in başını o kendisi tamamlıyor.
+            const response = await api.post('/auth/login', { email, password });
+
+            // Giriş başarılı, kullanıcı verisini Context'e kaydet
             login(response.data);
-            response.data.role === 'Volunteer' ? navigate('/volunteer') : navigate('/victim');
+
+            // Role göre yönlendirme (Senin ekran görüntündeki mantık)
+            if (response.data.role === 'Volunteer') {
+                navigate('/volunteer'); // Gönüllü sayfasına
+            } else {
+                navigate('/victim'); // Afetzede sayfasına
+            }
         } catch (error) {
-            alert('Giriş başarısız!');
+            console.error("Giriş hatası:", error);
+            alert('Giriş başarısız! E-posta veya şifre hatalı.');
         }
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
-            {/* Arka plan deseni için ayrı bir katman */}
-            <div className="absolute inset-0 z-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
+        <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white p-8">
+            <div className="w-full max-w-md bg-slate-900 p-8 rounded-xl shadow-2xl border border-slate-800">
+                <h2 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+                    QuakeSense
+                </h2>
+                <p className="text-slate-400 text-center mb-8">Sisteme Giriş Yap</p>
 
-            <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-10 shadow-2xl backdrop-blur-xl">
-                <div className="mb-8 text-center">
-                    <h1 className="text-4xl font-black tracking-tighter text-white">QuakeSense</h1>
-                    <p className="mt-2 text-sm font-medium text-slate-400 uppercase tracking-widest">Koordinasyon Sistemi</p>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-5">
+                <form onSubmit={handleLogin} className="space-y-6">
                     <div>
                         <input
                             type="email"
-                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-white outline-none ring-blue-500 transition focus:ring-2"
-                            placeholder="E-posta adresi"
+                            placeholder="E-posta Adresi"
+                            className="w-full p-4 bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                            value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
                         />
@@ -44,22 +53,31 @@ const Login = () => {
                     <div>
                         <input
                             type="password"
-                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-white outline-none ring-blue-500 transition focus:ring-2"
                             placeholder="Şifre"
+                            className="w-full p-4 bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                            value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
                         />
                     </div>
-                    <button type="submit" className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-500 active:scale-95">
-                        SİSTEME GİRİŞ YAP
+
+                    <button
+                        type="submit"
+                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold text-lg transition shadow-lg hover:shadow-blue-500/20"
+                    >
+                        GİRİŞ YAP
                     </button>
                 </form>
 
-                <div className="mt-8 border-t border-white/5 pt-6 text-center">
-                    <button onClick={() => navigate('/register')} className="text-sm text-slate-400 hover:text-white transition">
-                        Hesabınız yok mu? <span className="font-bold text-blue-400">Hemen Kayıt Ol</span>
-                    </button>
-                </div>
+                <p className="mt-6 text-center text-slate-400">
+                    Hesabınız yok mu?{' '}
+                    <span
+                        onClick={() => navigate('/register')}
+                        className="text-blue-400 cursor-pointer hover:underline"
+                    >
+                        Hemen Kayıt Ol
+                    </span>
+                </p>
             </div>
         </div>
     );
