@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber, IsOptional } from 'class-validator';
 
 export class CreateNeedDto {
   @IsString()
@@ -10,8 +10,8 @@ export class CreateNeedDto {
   description: string;
 
   @IsNumber()
-  @IsNotEmpty()
-  categoryId: number;
+  @IsOptional()
+  categoryId?: number;
 
   @IsNumber()
   @IsNotEmpty()

@@ -3,14 +3,18 @@ import api from '../api/axiosConfig';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, User, MapPin, Activity } from 'lucide-react';
+import CommentSection from '../components/CommentSection';
 
 const VictimDashboard = () => {
     const { user, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
     const [needs, setNeeds] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [subject, setSubject] = useState(''); // Konu
     const [details, setDetails] = useState(''); // Detay
+    const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false); // Loading state
 
     const fetchNeeds = async () => {
         try {
@@ -23,34 +27,88 @@ const VictimDashboard = () => {
 
     useEffect(() => {
         fetchNeeds();
+        fetchCategories();
     }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const response = await api.get('/categories');
+            setCategories(response.data);
+            if (response.data.length > 0 && !selectedCategoryId) {
+                setSelectedCategoryId(response.data[0].id);
+            }
+        } catch (error) {
+            console.error("Kategori çekme hatası:", error);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        console.log('=== FORM SUBMIT BAŞLADI ===');
+        console.log('User:', user);
+        console.log('Subject:', subject);
+        console.log('Details:', details);
 
         // Kullanıcı ID kontrolü (Güvenlik)
         if (!user || !user.id) {
+            console.error('User veya user.id yok:', user);
             alert("Oturum hatası: Lütfen tekrar giriş yapın.");
             return;
         }
 
+        // Form validasyonu
+        if (!subject.trim() || !details.trim()) {
+            alert("Lütfen tüm alanları doldurun.");
+            return;
+        }
+
+        setIsSubmitting(true);
+
         try {
-            // ARTIK KATEGORİ YOK! Sadece gerekli verileri yolluyoruz.
-            await api.post('/needs', {
-                title: subject,
-                description: details,
+            console.log('API çağrısı yapılıyor...');
+            const requestData = {
+                title: subject.trim(),
+                description: details.trim(),
                 userId: user.id,
-                latitude: 37.7749,
-                longitude: -122.4194,
-            });
+                categoryId: selectedCategoryId,
+            };
+            console.log('Gönderilen veri:', requestData);
+            
+            const response = await api.post('/needs', requestData);
+            console.log('API yanıtı:', response.data);
+            console.log('=== BAŞARILI ===');
 
             alert('Talep başarıyla iletildi!');
             setSubject('');
             setDetails('');
-            fetchNeeds();
+            await fetchNeeds();
         } catch (error) {
-            console.error("Talep hatası:", error);
-            alert('Bir hata oluştu. (Lütfen Backend dosyalarını güncellediğinden emin ol)');
+            console.error("=== TALEP HATASI ===");
+            console.error("Hata objesi:", error);
+            console.error("Hata mesajı:", error.message);
+            console.error("Response data:", error.response?.data);
+            console.error("Response status:", error.response?.status);
+            console.error("Response headers:", error.response?.headers);
+            
+            let errorMessage = 'Bilinmeyen bir hata oluştu';
+            
+            if (error.response?.data) {
+                // NestJS validation hataları
+                if (Array.isArray(error.response.data.message)) {
+                    errorMessage = error.response.data.message.join(', ');
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error.response.data.error) {
+                    errorMessage = error.response.data.error;
+                }
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            alert(`Bir hata oluştu: ${errorMessage}`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -59,6 +117,32 @@ const VictimDashboard = () => {
             logout();
             navigate('/login');
         }
+    };
+
+    const handleDeleteNeed = async (needId) => {
+        if (!window.confirm('Bu talebi silmek istediğinizden emin misiniz?')) {
+            return;
+        }
+
+        try {
+            await api.delete(`/needs/${needId}`);
+            alert('Talep başarıyla silindi!');
+            fetchNeeds();
+        } catch (error) {
+            console.error('Silme hatası:', error);
+            alert('Talep silinirken bir hata oluştu.');
+        }
+    };
+
+    const getStatusDisplay = (status) => {
+        const statusMap = {
+            'Açık': { text: 'Bekleniyor', color: 'bg-yellow-500/10 text-yellow-500', icon: '⏳' },
+            'Gönüllü Yolda': { text: 'Yolda', color: 'bg-blue-500/10 text-blue-500', icon: '🚗' },
+            'Yardım Edildi': { text: 'Tamamlandı', color: 'bg-green-500/10 text-green-500', icon: '✅' },
+        };
+        
+        const defaultStatus = { text: 'Bekleniyor', color: 'bg-yellow-500/10 text-yellow-500', icon: '⏳' };
+        return statusMap[status] || defaultStatus;
     };
 
     return (
@@ -97,6 +181,23 @@ const VictimDashboard = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
+                            <label className="block text-sm text-slate-400 mb-2 font-bold">Kategori</label>
+                            <select
+                                value={selectedCategoryId || ''}
+                                onChange={(e) => setSelectedCategoryId(Number(e.target.value))}
+                                className="w-full p-4 bg-slate-950 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition text-white"
+                                required
+                            >
+                                <option value="">Kategori Seçin</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
                             <label className="block text-sm text-slate-400 mb-2 font-bold">İhtiyaç Konusu</label>
                             <input
                                 type="text"
@@ -121,9 +222,14 @@ const VictimDashboard = () => {
 
                         <button
                             type="submit"
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-lg transition shadow-lg shadow-blue-900/20"
+                            disabled={isSubmitting}
+                            className={`w-full py-4 rounded-xl font-bold text-lg transition shadow-lg shadow-blue-900/20 ${
+                                isSubmitting 
+                                    ? 'bg-blue-400 cursor-not-allowed' 
+                                    : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
                         >
-                            TALEBİ YAYINLA
+                            {isSubmitting ? 'GÖNDERİLİYOR...' : 'TALEBİ YAYINLA'}
                         </button>
                     </form>
                 </div>
@@ -140,18 +246,33 @@ const VictimDashboard = () => {
                         </div>
                     ) : (
                         <div className="grid gap-4">
-                            {needs.map((need) => (
-                                <div key={need.id} className="bg-slate-900 p-5 rounded-xl border border-slate-800 flex flex-col gap-2 hover:border-slate-700 transition">
-                                    <div className="flex justify-between items-start">
-                                        <h4 className="text-lg font-bold text-blue-400">{need.title || "Başlıksız"}</h4>
-                                        <span className="bg-yellow-500/10 text-yellow-500 px-3 py-1 rounded-lg text-xs font-bold">Bekleniyor</span>
-                                    </div>
-                                    <p className="text-slate-300 font-medium text-sm">{need.description}</p>
-                                    <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-800">
-                                        {new Date(need.createdAt || Date.now()).toLocaleString('tr-TR')}
-                                    </p>
-                                </div>
-                            ))}
+                            {needs.map((need) => {
+                                    const statusDisplay = getStatusDisplay(need.status);
+                                    return (
+                                        <div key={need.id} className="bg-slate-900 p-5 rounded-xl border border-slate-800 flex flex-col gap-2 hover:border-slate-700 transition">
+                                            <div className="flex justify-between items-start">
+                                                <h4 className="text-lg font-bold text-blue-400">{need.title || "Başlıksız"}</h4>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`${statusDisplay.color} px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1`}>
+                                                        <span>{statusDisplay.icon}</span>
+                                                        <span>{statusDisplay.text}</span>
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleDeleteNeed(need.id)}
+                                                        className="bg-red-500/10 text-red-500 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-500/20 transition border border-red-500/20"
+                                                    >
+                                                        Sil
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p className="text-slate-300 font-medium text-sm">{need.description}</p>
+                                            <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-800">
+                                                {new Date(need.createdAt || Date.now()).toLocaleString('tr-TR')}
+                                            </p>
+                                            <CommentSection needId={need.id} />
+                                        </div>
+                                    );
+                                })}
                         </div>
                     )}
                 </div>

@@ -24,6 +24,22 @@ export class CommentsService {
     return this.commentRepository.find({
       where: { need: { id: needId } },
       relations: ['user'],
+      order: { id: 'DESC' },
     });
+  }
+
+  async findOne(id: number) {
+    return this.commentRepository.findOne({
+      where: { id },
+      relations: ['user', 'need'],
+    });
+  }
+
+  async remove(id: number) {
+    const comment = await this.findOne(id);
+    if (!comment) {
+      throw new Error('Yorum bulunamadı');
+    }
+    return this.commentRepository.remove(comment);
   }
 }

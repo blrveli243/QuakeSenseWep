@@ -20,11 +20,31 @@ function App() {
                 {/* Rol Bazlı Yönlendirme: Giriş yapılmadıysa Login'e atar */}
                 <Route
                     path="/victim"
-                    element={user ? <VictimDashboard /> : <Navigate to="/login" />}
+                    element={
+                        user ? (
+                            user.role === 'Victim' ? (
+                                <VictimDashboard />
+                            ) : (
+                                <Navigate to={user.role === 'Volunteer' ? '/volunteer' : '/login'} />
+                            )
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
                 />
                 <Route
                     path="/volunteer"
-                    element={user ? <VolunteerDashboard /> : <Navigate to="/login" />}
+                    element={
+                        user ? (
+                            user.role === 'Volunteer' ? (
+                                <VolunteerDashboard />
+                            ) : (
+                                <Navigate to={user.role === 'Victim' ? '/victim' : '/login'} />
+                            )
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
                 />
 
                 {/* Ana sayfa açıldığında otomatik olarak Login'e yönlendir */}
